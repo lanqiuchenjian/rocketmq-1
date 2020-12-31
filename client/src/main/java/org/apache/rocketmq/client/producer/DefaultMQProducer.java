@@ -269,9 +269,11 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
     @Override
     public void start() throws MQClientException {
         this.setProducerGroup(withNamespace(this.producerGroup));
+        //生产者逻辑
         this.defaultMQProducerImpl.start();
         if (null != traceDispatcher) {
             try {
+                //TODO:cj trace 后续处理
                 traceDispatcher.start(this.getNamesrvAddr(), this.getAccessChannel());
             } catch (MQClientException e) {
                 log.warn("trace dispatcher start failed ", e);

@@ -186,8 +186,10 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                     this.defaultMQProducer.changeInstanceNameToPID();
                 }
 
+                //创建MQClient实例，存在则返回
                 this.mQClientFactory = MQClientManager.getInstance().getOrCreateMQClientInstance(this.defaultMQProducer, rpcHook);
 
+                //TODO:cj 注册生产者信息，后续根据心跳发送生产者和消费到broker维护，是否维护到到nameServer?
                 boolean registerOK = mQClientFactory.registerProducer(this.defaultMQProducer.getProducerGroup(), this);
                 if (!registerOK) {
                     this.serviceState = ServiceState.CREATE_JUST;
@@ -196,8 +198,10 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                         null);
                 }
 
+                //创建默认的topic
                 this.topicPublishInfoTable.put(this.defaultMQProducer.getCreateTopicKey(), new TopicPublishInfo());
 
+                //初始化client
                 if (startFactory) {
                     mQClientFactory.start();
                 }
