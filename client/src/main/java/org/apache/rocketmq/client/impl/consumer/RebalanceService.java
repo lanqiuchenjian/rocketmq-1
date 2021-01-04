@@ -32,6 +32,7 @@ public class RebalanceService extends ServiceThread {
         this.mqClientFactory = mqClientFactory;
     }
 
+    // 负载均衡线程任务
     @Override
     public void run() {
         log.info(this.getServiceName() + " service started");

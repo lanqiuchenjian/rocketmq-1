@@ -154,9 +154,11 @@ public abstract class NettyRemotingAbstract {
         final RemotingCommand cmd = msg;
         if (cmd != null) {
             switch (cmd.getType()) {
+                //broker server端处理请求
                 case REQUEST_COMMAND:
                     processRequestCommand(ctx, cmd);
                     break;
+                //producer，consumer 处理响应结果
                 case RESPONSE_COMMAND:
                     processResponseCommand(ctx, cmd);
                     break;
@@ -220,10 +222,12 @@ public abstract class NettyRemotingAbstract {
                                 }
                             }
                         };
+                        //ASYNC
                         if (pair.getObject1() instanceof AsyncNettyRequestProcessor) {
                             AsyncNettyRequestProcessor processor = (AsyncNettyRequestProcessor)pair.getObject1();
                             processor.asyncProcessRequest(ctx, cmd, callback);
                         } else {
+                            //SYNC
                             NettyRequestProcessor processor = pair.getObject1();
                             RemotingCommand response = processor.processRequest(ctx, cmd);
                             callback.callback(response);
@@ -292,9 +296,11 @@ public abstract class NettyRemotingAbstract {
 
             responseTable.remove(opaque);
 
+            //ASYNC处理
             if (responseFuture.getInvokeCallback() != null) {
                 executeInvokeCallback(responseFuture);
             } else {
+                //SYNC处理
                 responseFuture.putResponse(cmd);
                 responseFuture.release();
             }
@@ -407,6 +413,7 @@ public abstract class NettyRemotingAbstract {
     public RemotingCommand invokeSyncImpl(final Channel channel, final RemotingCommand request,
         final long timeoutMillis)
         throws InterruptedException, RemotingSendRequestException, RemotingTimeoutException {
+        //opaque作为请求响应对应的唯一标识
         final int opaque = request.getOpaque();
 
         try {
@@ -430,6 +437,7 @@ public abstract class NettyRemotingAbstract {
                 }
             });
 
+            //同步等待结果
             RemotingCommand responseCommand = responseFuture.waitResponse(timeoutMillis);
             if (null == responseCommand) {
                 if (responseFuture.isSendRequestOK()) {
@@ -442,6 +450,7 @@ public abstract class NettyRemotingAbstract {
 
             return responseCommand;
         } finally {
+            //移除有明确结果的消息发送
             this.responseTable.remove(opaque);
         }
     }
@@ -461,6 +470,8 @@ public abstract class NettyRemotingAbstract {
             }
 
             final ResponseFuture responseFuture = new ResponseFuture(channel, opaque, timeoutMillis - costTime, invokeCallback, once);
+            //这种异步模式，opaque作为唯一id，标识请求响应对应
+            //netty，这个会有一个received，找到对应的返回bean设置返回值
             this.responseTable.put(opaque, responseFuture);
             try {
                 channel.writeAndFlush(request).addListener(new ChannelFutureListener() {

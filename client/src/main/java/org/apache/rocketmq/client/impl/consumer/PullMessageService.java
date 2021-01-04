@@ -89,9 +89,10 @@ public class PullMessageService extends ServiceThread {
     @Override
     public void run() {
         log.info(this.getServiceName() + " service started");
-
+        //pushConsumer客户端自动拉取消息
         while (!this.isStopped()) {
             try {
+                //请求拉取的消息来源于rebalance线程任务
                 PullRequest pullRequest = this.pullRequestQueue.take();
                 this.pullMessage(pullRequest);
             } catch (InterruptedException ignored) {

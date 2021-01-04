@@ -197,14 +197,12 @@ public class PullAPIWrapper {
                 brokerAddr = computePullFromWhichFilterServer(mq.getTopic(), brokerAddr);
             }
 
-            PullResult pullResult = this.mQClientFactory.getMQClientAPIImpl().pullMessage(
+            return this.mQClientFactory.getMQClientAPIImpl().pullMessage(
                 brokerAddr,
                 requestHeader,
                 timeoutMillis,
                 communicationMode,
                 pullCallback);
-
-            return pullResult;
         }
 
         throw new MQClientException("The broker[" + mq.getBrokerName() + "] not exist", null);

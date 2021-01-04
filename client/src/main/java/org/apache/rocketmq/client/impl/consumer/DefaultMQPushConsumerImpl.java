@@ -106,8 +106,10 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
     private PullAPIWrapper pullAPIWrapper;
     private volatile boolean pause = false;
     private boolean consumeOrderly = false;
+    //
     private MessageListener messageListenerInner;
     private OffsetStore offsetStore;
+    //
     private ConsumeMessageService consumeMessageService;
     private long queueFlowControlTimes = 0;
     private long queueMaxSpanFlowControlTimes = 0;
@@ -298,103 +300,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
 
         final long beginTimestamp = System.currentTimeMillis();
 
-        PullCallback pullCallback = new PullCallback() {
-            @Override
-            public void onSuccess(PullResult pullResult) {
-                if (pullResult != null) {
-                    pullResult = DefaultMQPushConsumerImpl.this.pullAPIWrapper.processPullResult(pullRequest.getMessageQueue(), pullResult,
-                        subscriptionData);
-
-                    switch (pullResult.getPullStatus()) {
-                        case FOUND:
-                            long prevRequestOffset = pullRequest.getNextOffset();
-                            pullRequest.setNextOffset(pullResult.getNextBeginOffset());
-                            long pullRT = System.currentTimeMillis() - beginTimestamp;
-                            DefaultMQPushConsumerImpl.this.getConsumerStatsManager().incPullRT(pullRequest.getConsumerGroup(),
-                                pullRequest.getMessageQueue().getTopic(), pullRT);
-
-                            long firstMsgOffset = Long.MAX_VALUE;
-                            if (pullResult.getMsgFoundList() == null || pullResult.getMsgFoundList().isEmpty()) {
-                                DefaultMQPushConsumerImpl.this.executePullRequestImmediately(pullRequest);
-                            } else {
-                                firstMsgOffset = pullResult.getMsgFoundList().get(0).getQueueOffset();
-
-                                DefaultMQPushConsumerImpl.this.getConsumerStatsManager().incPullTPS(pullRequest.getConsumerGroup(),
-                                    pullRequest.getMessageQueue().getTopic(), pullResult.getMsgFoundList().size());
-
-                                boolean dispatchToConsume = processQueue.putMessage(pullResult.getMsgFoundList());
-                                DefaultMQPushConsumerImpl.this.consumeMessageService.submitConsumeRequest(
-                                    pullResult.getMsgFoundList(),
-                                    processQueue,
-                                    pullRequest.getMessageQueue(),
-                                    dispatchToConsume);
-
-                                if (DefaultMQPushConsumerImpl.this.defaultMQPushConsumer.getPullInterval() > 0) {
-                                    DefaultMQPushConsumerImpl.this.executePullRequestLater(pullRequest,
-                                        DefaultMQPushConsumerImpl.this.defaultMQPushConsumer.getPullInterval());
-                                } else {
-                                    DefaultMQPushConsumerImpl.this.executePullRequestImmediately(pullRequest);
-                                }
-                            }
-
-                            if (pullResult.getNextBeginOffset() < prevRequestOffset
-                                || firstMsgOffset < prevRequestOffset) {
-                                log.warn(
-                                    "[BUG] pull message result maybe data wrong, nextBeginOffset: {} firstMsgOffset: {} prevRequestOffset: {}",
-                                    pullResult.getNextBeginOffset(),
-                                    firstMsgOffset,
-                                    prevRequestOffset);
-                            }
-
-                            break;
-                        case NO_NEW_MSG:
-                        case NO_MATCHED_MSG:
-                            pullRequest.setNextOffset(pullResult.getNextBeginOffset());
-
-                            DefaultMQPushConsumerImpl.this.correctTagsOffset(pullRequest);
-
-                            DefaultMQPushConsumerImpl.this.executePullRequestImmediately(pullRequest);
-                            break;
-                        case OFFSET_ILLEGAL:
-                            log.warn("the pull request offset illegal, {} {}",
-                                pullRequest.toString(), pullResult.toString());
-                            pullRequest.setNextOffset(pullResult.getNextBeginOffset());
-
-                            pullRequest.getProcessQueue().setDropped(true);
-                            DefaultMQPushConsumerImpl.this.executeTaskLater(new Runnable() {
-
-                                @Override
-                                public void run() {
-                                    try {
-                                        DefaultMQPushConsumerImpl.this.offsetStore.updateOffset(pullRequest.getMessageQueue(),
-                                            pullRequest.getNextOffset(), false);
-
-                                        DefaultMQPushConsumerImpl.this.offsetStore.persist(pullRequest.getMessageQueue());
-
-                                        DefaultMQPushConsumerImpl.this.rebalanceImpl.removeProcessQueue(pullRequest.getMessageQueue());
-
-                                        log.warn("fix the pull request offset, {}", pullRequest);
-                                    } catch (Throwable e) {
-                                        log.error("executeTaskLater Exception", e);
-                                    }
-                                }
-                            }, 10000);
-                            break;
-                        default:
-                            break;
-                    }
-                }
-            }
-
-            @Override
-            public void onException(Throwable e) {
-                if (!pullRequest.getMessageQueue().getTopic().startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
-                    log.warn("execute the pull request exception", e);
-                }
-
-                DefaultMQPushConsumerImpl.this.executePullRequestLater(pullRequest, pullTimeDelayMillsWhenException);
-            }
-        };
+        PullCallback pullCallback = getPullCallback(pullRequest, processQueue, subscriptionData, beginTimestamp);
 
         boolean commitOffsetEnable = false;
         long commitOffsetValue = 0L;
@@ -441,6 +347,100 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
             log.error("pullKernelImpl exception", e);
             this.executePullRequestLater(pullRequest, pullTimeDelayMillsWhenException);
         }
+    }
+
+    private PullCallback getPullCallback(PullRequest pullRequest, ProcessQueue processQueue, SubscriptionData subscriptionData, long beginTimestamp) {
+        return new PullCallback() {
+                @Override
+                public void onSuccess(PullResult pullResult) {
+                    if (pullResult != null) {
+                        pullResult = DefaultMQPushConsumerImpl.this.pullAPIWrapper.processPullResult(pullRequest.getMessageQueue(), pullResult,
+                            subscriptionData);
+
+                        switch (pullResult.getPullStatus()) {
+                            case FOUND:
+                                long prevRequestOffset = pullRequest.getNextOffset();
+                                pullRequest.setNextOffset(pullResult.getNextBeginOffset());
+                                long pullRT = System.currentTimeMillis() - beginTimestamp;
+                                DefaultMQPushConsumerImpl.this.getConsumerStatsManager().incPullRT(pullRequest.getConsumerGroup(),
+                                    pullRequest.getMessageQueue().getTopic(), pullRT);
+
+                                long firstMsgOffset = Long.MAX_VALUE;
+                                if (pullResult.getMsgFoundList() == null || pullResult.getMsgFoundList().isEmpty()) {
+                                    DefaultMQPushConsumerImpl.this.executePullRequestImmediately(pullRequest);
+                                } else {
+                                    firstMsgOffset = pullResult.getMsgFoundList().get(0).getQueueOffset();
+
+                                    DefaultMQPushConsumerImpl.this.getConsumerStatsManager().incPullTPS(pullRequest.getConsumerGroup(),
+                                        pullRequest.getMessageQueue().getTopic(), pullResult.getMsgFoundList().size());
+
+                                    boolean dispatchToConsume = processQueue.putMessage(pullResult.getMsgFoundList());
+                                    //回调用户push consumer逻辑
+                                    DefaultMQPushConsumerImpl.this.consumeMessageService.submitConsumeRequest(pullResult.getMsgFoundList(),
+                                        processQueue, pullRequest.getMessageQueue(), dispatchToConsume);
+
+                                    //继续pull任务
+                                    if (DefaultMQPushConsumerImpl.this.defaultMQPushConsumer.getPullInterval() > 0) {
+                                        DefaultMQPushConsumerImpl.this.executePullRequestLater(pullRequest, DefaultMQPushConsumerImpl.this.defaultMQPushConsumer.getPullInterval());
+                                    } else {
+                                        DefaultMQPushConsumerImpl.this.executePullRequestImmediately(pullRequest);
+                                    }
+                                }
+
+                                if (pullResult.getNextBeginOffset() < prevRequestOffset || firstMsgOffset < prevRequestOffset) {
+                                    log.warn("[BUG] pull message result maybe data wrong, nextBeginOffset: {} firstMsgOffset: {} prevRequestOffset: {}",
+                                        pullResult.getNextBeginOffset(), firstMsgOffset, prevRequestOffset);
+                                }
+
+                                break;
+                            case NO_NEW_MSG:
+                            case NO_MATCHED_MSG:
+                                pullRequest.setNextOffset(pullResult.getNextBeginOffset());
+
+                                DefaultMQPushConsumerImpl.this.correctTagsOffset(pullRequest);
+
+                                DefaultMQPushConsumerImpl.this.executePullRequestImmediately(pullRequest);
+                                break;
+                            case OFFSET_ILLEGAL:
+                                log.warn("the pull request offset illegal, {} {}",
+                                    pullRequest.toString(), pullResult.toString());
+                                pullRequest.setNextOffset(pullResult.getNextBeginOffset());
+
+                                pullRequest.getProcessQueue().setDropped(true);
+                                DefaultMQPushConsumerImpl.this.executeTaskLater(new Runnable() {
+
+                                    @Override
+                                    public void run() {
+                                        try {
+                                            DefaultMQPushConsumerImpl.this.offsetStore.updateOffset(pullRequest.getMessageQueue(),
+                                                pullRequest.getNextOffset(), false);
+
+                                            DefaultMQPushConsumerImpl.this.offsetStore.persist(pullRequest.getMessageQueue());
+
+                                            DefaultMQPushConsumerImpl.this.rebalanceImpl.removeProcessQueue(pullRequest.getMessageQueue());
+
+                                            log.warn("fix the pull request offset, {}", pullRequest);
+                                        } catch (Throwable e) {
+                                            log.error("executeTaskLater Exception", e);
+                                        }
+                                    }
+                                }, 10000);
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                }
+
+                @Override
+                public void onException(Throwable e) {
+                    if (!pullRequest.getMessageQueue().getTopic().startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
+                        log.warn("execute the pull request exception", e);
+                    }
+
+                    DefaultMQPushConsumerImpl.this.executePullRequestLater(pullRequest, pullTimeDelayMillsWhenException);
+                }
+            };
     }
 
     private void makeSureStateOK() throws MQClientException {
@@ -579,6 +579,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                     this.defaultMQPushConsumer.changeInstanceNameToPID();
                 }
 
+                //创建消费者客户端MQClientInstance
                 this.mQClientFactory = MQClientManager.getInstance().getOrCreateMQClientInstance(this.defaultMQPushConsumer, this.rpcHook);
 
                 this.rebalanceImpl.setConsumerGroup(this.defaultMQPushConsumer.getConsumerGroup());
@@ -594,6 +595,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 if (this.defaultMQPushConsumer.getOffsetStore() != null) {
                     this.offsetStore = this.defaultMQPushConsumer.getOffsetStore();
                 } else {
+                    //offset存储 广播模式：本地存储 集群模式：broker存储
                     switch (this.defaultMQPushConsumer.getMessageModel()) {
                         case BROADCASTING:
                             this.offsetStore = new LocalFileOffsetStore(this.mQClientFactory, this.defaultMQPushConsumer.getConsumerGroup());
@@ -608,6 +610,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 }
                 this.offsetStore.load();
 
+
                 if (this.getMessageListenerInner() instanceof MessageListenerOrderly) {
                     this.consumeOrderly = true;
                     this.consumeMessageService =
@@ -618,6 +621,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                         new ConsumeMessageConcurrentlyService(this, (MessageListenerConcurrently) this.getMessageListenerInner());
                 }
 
+                //TODO:cj 定时任务，开启过期消息处理，哪些？
                 this.consumeMessageService.start();
 
                 boolean registerOK = mQClientFactory.registerConsumer(this.defaultMQPushConsumer.getConsumerGroup(), this);

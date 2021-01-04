@@ -137,6 +137,7 @@ public class RebalancePushImpl extends RebalanceImpl {
         this.defaultMQPushConsumerImpl.getOffsetStore().removeOffset(mq);
     }
 
+    @SuppressWarnings("all")
     @Override
     public long computePullFromWhere(MessageQueue mq) {
         long result = -1;
