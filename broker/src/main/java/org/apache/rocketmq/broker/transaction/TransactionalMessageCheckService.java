@@ -36,6 +36,7 @@ public class TransactionalMessageCheckService extends ServiceThread {
         return TransactionalMessageCheckService.class.getSimpleName();
     }
 
+    //事务消息，本地事务不明时，消息回查状态
     @Override
     public void run() {
         log.info("Start transaction check service thread!");

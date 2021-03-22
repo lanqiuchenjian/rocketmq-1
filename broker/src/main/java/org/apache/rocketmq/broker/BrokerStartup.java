@@ -219,12 +219,15 @@ public class BrokerStartup {
             // remember all configs to prevent discard
             controller.getConfiguration().registerConfig(properties);
 
+            //broker controller初始化
             boolean initResult = controller.initialize();
+
             if (!initResult) {
                 controller.shutdown();
                 System.exit(-3);
             }
 
+            //hook，关闭时唤起
             Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
                 private volatile boolean hasShutdown = false;
                 private AtomicInteger shutdownTimes = new AtomicInteger(0);
@@ -249,7 +252,6 @@ public class BrokerStartup {
             e.printStackTrace();
             System.exit(-1);
         }
-
         return null;
     }
 

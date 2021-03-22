@@ -88,7 +88,6 @@ class ListSplitter implements Iterator<List<Message>> {
             } else {
                 totalSize += tmpSize;
             }
-
         }
         List<Message> subList = messages.subList(currIndex, nextIndex);
         currIndex = nextIndex;

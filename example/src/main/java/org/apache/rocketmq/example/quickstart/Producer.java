@@ -50,7 +50,8 @@ public class Producer {
          */
         //指定nameServer地址，nameServer之间互相不通信，可以配置多个
         //TODO:cj nameServer如何通信，如何选取，后续详解
-        producer.setNamesrvAddr("name-server1-ip:9876;name-server2-ip:9876");
+//        producer.setNamesrvAddr("name-server1-ip:9876;name-server2-ip:9876");
+        producer.setNamesrvAddr("127.0.0.1:9876");
         //初始化生产者信息
         producer.start();
 

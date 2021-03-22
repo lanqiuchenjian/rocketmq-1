@@ -340,7 +340,12 @@ public abstract class RebalanceImpl {
             ProcessQueue pq = next.getValue();
 
             if (mq.getTopic().equals(topic)) {
+                //分给当前consumer的queue减少，
+                //满足： 1.queue size > consumer size 2.consumer 数量增加
+                //满足： queue size 减少
                 if (!mqSet.contains(mq)) {
+                    //置为丢弃，发送的时候会判断标志位，丢弃则后续不会添加到任务队列
+                    //这个pq会在request实例会在队列重复使用，此次置为失效，就不会继续拉取
                     pq.setDropped(true);
                     if (this.removeUnnecessaryMessageQueue(mq, pq)) {
                         it.remove();
@@ -377,7 +382,7 @@ public abstract class RebalanceImpl {
 
                 this.removeDirtyOffset(mq);
                 ProcessQueue pq = new ProcessQueue();
-                //从哪里开始消费
+                //从哪里开始消费,获取消费的offset
                 long nextOffset = this.computePullFromWhere(mq);
                 if (nextOffset >= 0) {
                     ProcessQueue pre = this.processQueueTable.putIfAbsent(mq, pq);
@@ -399,7 +404,14 @@ public abstract class RebalanceImpl {
             }
         }
 
-        //push 处理自动pull请求
+
+        /**
+         *  push 处理自动pull请求，两种情况
+         *  1.首次生成轮询任务queue
+         *  2.consumer发生变化时，重新分配queue
+         *    1.别的consumer减少和queue新增情况一致，本机新增拉取的queue，已存在的不变，触发一次在负载均衡
+         *    2.别的consumer增加和queue减少，本机减少拉取的queue，这种情况涉及缩容，比较复杂些。
+         */
         this.dispatchPullRequest(pullRequestList);
 
         return changed;

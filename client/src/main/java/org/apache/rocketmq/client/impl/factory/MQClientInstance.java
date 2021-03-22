@@ -157,13 +157,17 @@ public class MQClientInstance {
             MQVersion.getVersionDesc(MQVersion.CURRENT_VERSION), RemotingCommand.getSerializeTypeConfigInThisServer());
     }
 
+    //TopicPublishInfo 更新messageQueueList
     public static TopicPublishInfo topicRouteData2TopicPublishInfo(final String topic, final TopicRouteData route) {
         TopicPublishInfo info = new TopicPublishInfo();
         info.setTopicRouteData(route);
+
+        //顺序消息
         if (route.getOrderTopicConf() != null && route.getOrderTopicConf().length() > 0) {
             String[] brokers = route.getOrderTopicConf().split(";");
             for (String broker : brokers) {
                 String[] item = broker.split(":");
+                //分号前面是broker名称，后面是topic对应的queue个数
                 int nums = Integer.parseInt(item[1]);
                 for (int i = 0; i < nums; i++) {
                     MessageQueue mq = new MessageQueue(topic, item[0], i);
@@ -199,7 +203,6 @@ public class MQClientInstance {
                     }
                 }
             }
-
             info.setOrderTopic(false);
         }
 
@@ -475,6 +478,7 @@ public class MQClientInstance {
         }
     }
 
+    // producer，consumer 作为客户端发送心跳到broker
     public void sendHeartbeatToAllBrokerWithLock() {
         if (this.lockHeartbeat.tryLock()) {
             try {
@@ -702,7 +706,7 @@ public class MQClientInstance {
         return false;
     }
 
-    //心跳，上送生产者消费者broker
+    //心跳，上送producer， consumer信息消费者broker
     private HeartbeatData prepareHeartbeatData() {
         HeartbeatData heartbeatData = new HeartbeatData();
 

@@ -785,6 +785,7 @@ public class CommitLog {
 
     }
 
+    @SuppressWarnings("all")
     public PutMessageResult putMessage(final MessageExtBrokerInner msg) {
         // Set the storage time
         msg.setStoreTimestamp(System.currentTimeMillis());

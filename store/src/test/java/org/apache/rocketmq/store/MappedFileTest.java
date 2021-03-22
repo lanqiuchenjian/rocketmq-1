@@ -21,16 +21,59 @@
 package org.apache.rocketmq.store;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 
 import org.apache.rocketmq.common.UtilAll;
 import org.junit.After;
 import org.junit.Test;
+import sun.nio.ch.DirectBuffer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@SuppressWarnings("all")
 public class MappedFileTest {
     private final String storeMessage = "Once, there was a chance for me!";
+
+    public static void main(String[] args) throws IOException {
+        String dir = "D:\\Users\\jchen26\\Desktop\\test_project\\rocketmq-1\\store\\target\\unit_test_store\\MappedFileTest";
+        String pathname = "000";
+        ensureDirOK(dir);
+        File file = new File(dir + "/" + pathname);
+        RandomAccessFile randomAccessFile = new RandomAccessFile(file, "rw");
+        MappedByteBuffer map = randomAccessFile.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, 150);
+        map.put("wo shi tain cai".getBytes());
+        System.out.println("xxx");
+        randomAccessFile.close();
+        ((DirectBuffer)map).cleaner().clean();
+        File file1 = new File("D:\\Users\\jchen26\\Desktop\\test_project\\rocketmq-1\\store\\target\\unit_test_store");
+        UtilAll.deleteFile(file1);
+    }
+
+    @Test
+    public void testBuffer() throws IOException {
+        String dir = "target/unit_test_store/MappedFileTest";
+        String pathname = "000";
+        ensureDirOK(dir);
+        File file = new File(dir + "/" + pathname);
+        RandomAccessFile randomAccessFile = new RandomAccessFile(file, "rw");
+        MappedByteBuffer map = randomAccessFile.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, 150);
+        map.put("wo shi tain cai".getBytes());
+        System.out.println("xxx");
+    }
+
+    @SuppressWarnings("all")
+    private static void ensureDirOK(final String dirName) {
+        if (dirName != null) {
+            File f = new File(dirName);
+            if (!f.exists()) {
+                boolean result = f.mkdirs();
+            }
+        }
+    }
 
     @Test
     public void testSelectMappedBuffer() throws IOException {
@@ -54,6 +97,14 @@ public class MappedFileTest {
 
     @After
     public void destory() {
+        System.out.println("ppp");
+        File file = new File("target/unit_test_store");
+        UtilAll.deleteFile(file);
+        manuelDestory();
+    }
+
+    @Test
+    public void manuelDestory() {
         File file = new File("target/unit_test_store");
         UtilAll.deleteFile(file);
     }
